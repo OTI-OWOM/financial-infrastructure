@@ -249,3 +249,28 @@
   (/ (+ volatility liquidity correlation) u3)
 )
 
+
+(define-data-var contract-paused bool false)
+
+(define-public (pause-contract)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (var-set contract-paused true)
+    (ok true)
+  )
+)
+
+(define-public (unpause-contract)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (var-set contract-paused false)
+    (ok true)
+  )
+)
+
+(define-private (check-not-paused)
+  (if (var-get contract-paused)
+      (err ERR-NOT-AUTHORIZED)
+      (ok true)
+  )
+)
