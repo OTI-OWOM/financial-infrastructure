@@ -44,3 +44,24 @@
     risk-category: uint
   }
 )
+
+;; Escrow Service
+(define-map escrow-contracts 
+  uint 
+  {
+    sender: principal,
+    recipient: principal,
+    amount: uint,
+    is-released: bool,
+    is-disputed: bool,
+    dispute-resolver: principal
+  }
+)
+
+;; Initialization Function
+(define-public (initialize)
+  (begin
+    (map-set admin-list tx-sender true)
+    (ok true)
+  )
+)
