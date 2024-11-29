@@ -312,3 +312,54 @@
     )
   )
 )
+
+(define-constant ERR-RATE-LIMIT-EXCEEDED (err u1000))
+(define-constant RATE-LIMIT-WINDOW u300)
+(define-constant MAX-TXS-PER-WINDOW u10)
+
+(define-map rate-limits 
+  principal 
+  {
+    last-tx-timestamp: uint,
+    tx-count: uint,
+    window-start: uint
+  }
+)
+
+(define-private (check-and-update-rate-limit)
+  (let 
+    ((current-limit 
+      (default-to 
+        {
+          last-tx-timestamp: u0, 
+          tx-count: u0, 
+          window-start: stacks-block-height
+        } 
+        (map-get? rate-limits tx-sender))))
+    
+    (if (> (- stacks-block-height (get window-start current-limit)) RATE-LIMIT-WINDOW)
+        ;; Reset window if expired
+        (begin
+          (map-set rate-limits tx-sender {
+            last-tx-timestamp: stacks-block-height,
+            tx-count: u1,
+            window-start: stacks-block-height
+          })
+          (ok true)
+        )
+        ;; Check if within limits
+        (if (< (get tx-count current-limit) MAX-TXS-PER-WINDOW)
+            (begin
+              (map-set rate-limits tx-sender {
+                last-tx-timestamp: stacks-block-height,
+                tx-count: (+ (get tx-count current-limit) u1),
+                window-start: (get window-start current-limit)
+              })
+              (ok true)
+            )
+            (err ERR-RATE-LIMIT-EXCEEDED)
+        )
+    )
+  )
+)
+
