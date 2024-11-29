@@ -20,3 +20,27 @@
     reputation-score: uint
   }
 )
+
+;; Credit Scoring
+(define-map credit-profiles 
+  principal 
+  {
+    credit-score: uint,
+    total-loans: uint,
+    total-repaid: uint,
+    default-count: uint,
+    risk-rating: uint
+  }
+)
+
+;; Insurance Policies
+(define-map insurance-policies 
+  { policy-id: uint, user: principal }
+  { 
+    coverage-amount: uint,
+    premium: uint,
+    expiration: uint,
+    is-claimed: bool,
+    risk-category: uint
+  }
+)
