@@ -274,3 +274,41 @@
       (ok true)
   )
 )
+
+(define-map fee-structure 
+  (string-ascii 50) 
+  {
+    base-fee: uint,
+    percentage-fee: uint,
+    is-active: bool
+  }
+)
+
+(define-public (set-fee-structure 
+  (service-type (string-ascii 50))
+  (base-fee uint)
+  (percentage-fee uint)
+)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (map-set fee-structure service-type {
+      base-fee: base-fee,
+      percentage-fee: percentage-fee,
+      is-active: true
+    })
+    (ok true)
+  )
+)
+
+(define-private (calculate-fee 
+  (service-type (string-ascii 50))
+  (transaction-amount uint)
+)
+  (let 
+    ((fee-info (unwrap-panic (map-get? fee-structure service-type))))
+    (+ 
+      (get base-fee fee-info)
+      (/ (* transaction-amount (get percentage-fee fee-info)) u10000)
+    )
+  )
+)
