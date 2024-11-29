@@ -5,6 +5,7 @@
 (define-constant ERR-INVALID-PARAMETERS (err u1003))
 (define-constant ERR-ALREADY-EXISTS (err u1004))
 (define-constant ERR-NOT-FOUND (err u1005))
+(define-constant ERR-RATE-LIMIT (err u1006))
 
 ;; Governance and Access Control
 (define-map admin-list principal bool)
@@ -105,5 +106,100 @@
     )
     (ok true)
   )
+)
+
+;; Credit Scoring Mechanism
+(define-public (update-credit-profile 
+  (user principal)
+  (loan-amount uint)
+  (is-repaid bool)
+)
+  (let 
+    (
+      (current-profile 
+        (default-to 
+          {
+            credit-score: u500,
+            total-loans: u0,
+            total-repaid: u0,
+            default-count: u0,
+            risk-rating: u5
+          }
+          (map-get? credit-profiles user)
+        )
+      )
+      (new-profile 
+        (if is-repaid
+            {
+              credit-score: (+ (get credit-score current-profile) u10),
+              total-loans: (+ (get total-loans current-profile) loan-amount),
+              total-repaid: (+ (get total-repaid current-profile) loan-amount),
+              default-count: (get default-count current-profile),
+              risk-rating: (if (< (get risk-rating current-profile) u2) u2 (- (get risk-rating current-profile) u1))
+            }
+            {
+              credit-score: (- (get credit-score current-profile) u20),
+              total-loans: (+ (get total-loans current-profile) loan-amount),
+              total-repaid: (get total-repaid current-profile),
+              default-count: (+ (get default-count current-profile) u1),
+              risk-rating: (+ (get risk-rating current-profile) u2)
+            }
+        )
+      )
+    )
+    (map-set credit-profiles user new-profile)
+    (ok true)
+  )
+)
+
+(define-constant CONTRACT-OWNER tx-sender)
+(define-constant MAX-ADMIN-LIMIT u10)
+
+;;  Advanced Compliance Management
+(define-map compliance-registry 
+  principal 
+  {
+    is-compliant: bool,
+    jurisdiction: (string-ascii 50),
+    compliance-level: uint,
+    last-audit-timestamp: uint
+  }
+)
+
+;; Automated Yield Farming
+(define-map yield-farming-pools 
+  uint 
+  {
+    pool-name: (string-utf8 50),
+    total-liquidity: uint,
+    apr: uint,
+    is-active: bool,
+    risk-factor: uint
+  }
+)
+
+;; Cross-Chain Asset Mapping
+(define-map cross-chain-assets 
+  { 
+    asset-id: uint, 
+    chain-id: uint 
+  }
+  {
+    original-chain: uint,
+    wrapped-amount: uint,
+    bridge-status: bool,
+    lock-timestamp: uint
+  }
+)
+
+;; Advanced Risk Assessment
+(define-map risk-assessment-profiles 
+  principal 
+  {
+    overall-risk-score: uint,
+    volatility-index: uint,
+    liquidity-score: uint,
+    market-correlation: uint
+  }
 )
 
