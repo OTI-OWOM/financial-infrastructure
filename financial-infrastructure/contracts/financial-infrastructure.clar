@@ -363,3 +363,52 @@
   )
 )
 
+(define-map reputation-scores 
+  principal 
+  {
+    overall-reputation: uint,
+    transaction-count: uint,
+    positive-interactions: uint,
+    negative-interactions: uint,
+    last-updated: uint
+  }
+)
+
+(define-public (update-reputation 
+  (user principal)
+  (is-positive bool)
+)
+  (let 
+    ((current-reputation 
+      (default-to 
+        {
+          overall-reputation: u500,
+          transaction-count: u0,
+          positive-interactions: u0,
+          negative-interactions: u0,
+          last-updated: stacks-block-height
+        } 
+        (map-get? reputation-scores user)
+      ))
+     (updated-reputation 
+      (if is-positive
+          {
+            overall-reputation: (+ (get overall-reputation current-reputation) u10),
+            transaction-count: (+ (get transaction-count current-reputation) u1),
+            positive-interactions: (+ (get positive-interactions current-reputation) u1),
+            negative-interactions: (get negative-interactions current-reputation),
+            last-updated: stacks-block-height
+          }
+          {
+            overall-reputation: (- (get overall-reputation current-reputation) u10),
+            transaction-count: (+ (get transaction-count current-reputation) u1),
+            positive-interactions: (get positive-interactions current-reputation),
+            negative-interactions: (+ (get negative-interactions current-reputation) u1),
+            last-updated: stacks-block-height
+          }
+      ))
+    )
+    (map-set reputation-scores user updated-reputation)
+    (ok true)
+  )
+)
