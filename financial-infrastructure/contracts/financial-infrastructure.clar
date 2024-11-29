@@ -65,3 +65,45 @@
     (ok true)
   )
 )
+
+(define-read-only (is-admin (user principal))
+  (default-to false (map-get? admin-list user))
+)
+
+;; Decentralized Identity Management
+(define-public (register-did 
+  (did-hash (buff 32))
+)
+  (begin
+    (asserts! (is-none (map-get? did-registry tx-sender)) ERR-ALREADY-EXISTS)
+    (map-set did-registry tx-sender 
+      {
+        did-hash: did-hash,
+        verification-status: false,
+        attestation-timestamp: stacks-block-height,
+        reputation-score: u500
+      }
+    )
+    (ok true)
+  )
+)
+
+(define-public (verify-did 
+  (user principal)
+  (verification-proof (buff 32))
+)
+  (let 
+    (
+      (did-entry (unwrap! (map-get? did-registry user) ERR-NOT-FOUND))
+    )
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (map-set did-registry user 
+      (merge did-entry { 
+        verification-status: true,
+        reputation-score: (+ (get reputation-score did-entry) u50) 
+      })
+    )
+    (ok true)
+  )
+)
+
