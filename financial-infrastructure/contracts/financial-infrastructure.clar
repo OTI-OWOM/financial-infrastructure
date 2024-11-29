@@ -249,3 +249,166 @@
   (/ (+ volatility liquidity correlation) u3)
 )
 
+
+(define-data-var contract-paused bool false)
+
+(define-public (pause-contract)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (var-set contract-paused true)
+    (ok true)
+  )
+)
+
+(define-public (unpause-contract)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (var-set contract-paused false)
+    (ok true)
+  )
+)
+
+(define-private (check-not-paused)
+  (if (var-get contract-paused)
+      (err ERR-NOT-AUTHORIZED)
+      (ok true)
+  )
+)
+
+(define-map fee-structure 
+  (string-ascii 50) 
+  {
+    base-fee: uint,
+    percentage-fee: uint,
+    is-active: bool
+  }
+)
+
+(define-public (set-fee-structure 
+  (service-type (string-ascii 50))
+  (base-fee uint)
+  (percentage-fee uint)
+)
+  (begin
+    (asserts! (is-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (map-set fee-structure service-type {
+      base-fee: base-fee,
+      percentage-fee: percentage-fee,
+      is-active: true
+    })
+    (ok true)
+  )
+)
+
+(define-private (calculate-fee 
+  (service-type (string-ascii 50))
+  (transaction-amount uint)
+)
+  (let 
+    ((fee-info (unwrap-panic (map-get? fee-structure service-type))))
+    (+ 
+      (get base-fee fee-info)
+      (/ (* transaction-amount (get percentage-fee fee-info)) u10000)
+    )
+  )
+)
+
+(define-constant ERR-RATE-LIMIT-EXCEEDED (err u1000))
+(define-constant RATE-LIMIT-WINDOW u300)
+(define-constant MAX-TXS-PER-WINDOW u10)
+
+(define-map rate-limits 
+  principal 
+  {
+    last-tx-timestamp: uint,
+    tx-count: uint,
+    window-start: uint
+  }
+)
+
+(define-private (check-and-update-rate-limit)
+  (let 
+    ((current-limit 
+      (default-to 
+        {
+          last-tx-timestamp: u0, 
+          tx-count: u0, 
+          window-start: stacks-block-height
+        } 
+        (map-get? rate-limits tx-sender))))
+    
+    (if (> (- stacks-block-height (get window-start current-limit)) RATE-LIMIT-WINDOW)
+        ;; Reset window if expired
+        (begin
+          (map-set rate-limits tx-sender {
+            last-tx-timestamp: stacks-block-height,
+            tx-count: u1,
+            window-start: stacks-block-height
+          })
+          (ok true)
+        )
+        ;; Check if within limits
+        (if (< (get tx-count current-limit) MAX-TXS-PER-WINDOW)
+            (begin
+              (map-set rate-limits tx-sender {
+                last-tx-timestamp: stacks-block-height,
+                tx-count: (+ (get tx-count current-limit) u1),
+                window-start: (get window-start current-limit)
+              })
+              (ok true)
+            )
+            (err ERR-RATE-LIMIT-EXCEEDED)
+        )
+    )
+  )
+)
+
+(define-map reputation-scores 
+  principal 
+  {
+    overall-reputation: uint,
+    transaction-count: uint,
+    positive-interactions: uint,
+    negative-interactions: uint,
+    last-updated: uint
+  }
+)
+
+(define-public (update-reputation 
+  (user principal)
+  (is-positive bool)
+)
+  (let 
+    ((current-reputation 
+      (default-to 
+        {
+          overall-reputation: u500,
+          transaction-count: u0,
+          positive-interactions: u0,
+          negative-interactions: u0,
+          last-updated: stacks-block-height
+        } 
+        (map-get? reputation-scores user)
+      ))
+     (updated-reputation 
+      (if is-positive
+          {
+            overall-reputation: (+ (get overall-reputation current-reputation) u10),
+            transaction-count: (+ (get transaction-count current-reputation) u1),
+            positive-interactions: (+ (get positive-interactions current-reputation) u1),
+            negative-interactions: (get negative-interactions current-reputation),
+            last-updated: stacks-block-height
+          }
+          {
+            overall-reputation: (- (get overall-reputation current-reputation) u10),
+            transaction-count: (+ (get transaction-count current-reputation) u1),
+            positive-interactions: (get positive-interactions current-reputation),
+            negative-interactions: (+ (get negative-interactions current-reputation) u1),
+            last-updated: stacks-block-height
+          }
+      ))
+    )
+    (map-set reputation-scores user updated-reputation)
+    (ok true)
+  )
+)
